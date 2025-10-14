@@ -17,11 +17,12 @@ RED = (255,0,0)
 BLUE = (0,0,255)
 GREEN = (0,255,0)
 
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT),pygame.RESIZABLE)
 font = pygame.font.SysFont(None, 40)
 big_font = pygame.font.SysFont(None, 80)
 small_font = pygame.font.SysFont(None, 30)
 clock = pygame.time.Clock()
+pygame.display.set_caption("1v1Bingo")
 
 # -------------------
 # CLASS
