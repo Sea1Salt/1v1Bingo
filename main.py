@@ -6,38 +6,46 @@ pygame.init()
 
 # CONFIG
 SIZE = 5
-CELL_SIZE = 60
+CELL_SIZE = 50
 MARGIN = 20
 GAP = 50
 SCREEN_WIDTH = SIZE*CELL_SIZE*2 + MARGIN*4 + GAP + 200
-SCREEN_HEIGHT = SIZE*CELL_SIZE + MARGIN*2 + 150
+SCREEN_HEIGHT = SIZE*CELL_SIZE + MARGIN*2 + 200
 WHITE = (255,255,255)
 BLACK = (0,0,0)
 RED = (255,0,0)
 BLUE = (0,0,255)
 GREEN = (0,255,0)
 
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT),pygame.RESIZABLE)
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.FULLSCREEN | pygame.RESIZABLE)
 font = pygame.font.SysFont(None, 40)
 big_font = pygame.font.SysFont(None, 80)
 small_font = pygame.font.SysFont(None, 30)
 clock = pygame.time.Clock()
-pygame.display.set_caption("1v1Bingo")
+pygame.display.set_caption("🔥 1v1 BINGO 🔥")
 
 # -------------------
 # CLASS
 # -------------------
 class Cell:
-    def __init__(self, number, rect):
+    def __init__(self, number, rect, type="normal"):
         self.number = number
         self.marked = False
         self.rect = rect
+        self.type = type   # normal / block
+        self.blocked = False
 
     def draw(self, surface):
-        pygame.draw.rect(surface, (200,200,200), self.rect)
+        color = (200,200,200)
+        if self.blocked:
+            color = (150,150,150)
+        pygame.draw.rect(surface, color, self.rect)
         pygame.draw.rect(surface, BLACK, self.rect, 2)
-        num_text = font.render(str(self.number), True, BLACK)
-        surface.blit(num_text, num_text.get_rect(center=self.rect.center))
+
+        text = str(self.number) if not self.blocked else "BLOCKED"
+        text_surface = small_font.render(text, True, BLACK)
+        surface.blit(text_surface, text_surface.get_rect(center=self.rect.center))
+
         if self.marked:
             pygame.draw.circle(surface, RED, self.rect.center, CELL_SIZE//3, 5)
 
@@ -50,13 +58,16 @@ class Board:
 
     def generate_cells(self):
         numbers = random.sample(range(1, self.size*self.size*2), self.size*self.size)
+        block_indices = random.sample(range(self.size*self.size), 3)  # 3 ช่อง block
         self.cells = []
         x0, y0 = self.position
         for i in range(self.size):
             row = []
             for j in range(self.size):
+                idx = i*self.size + j
+                cell_type = "block" if idx in block_indices else "normal"
                 rect = pygame.Rect(x0 + j*CELL_SIZE, y0 + i*CELL_SIZE, CELL_SIZE, CELL_SIZE)
-                row.append(Cell(numbers[i*self.size + j], rect))
+                row.append(Cell(numbers[idx], rect, cell_type))
             self.cells.append(row)
 
     def draw(self, surface):
@@ -67,8 +78,10 @@ class Board:
     def mark_number(self, num):
         for row in self.cells:
             for cell in row:
-                if cell.number == num:
+                if cell.number == num and not cell.blocked:
                     cell.marked = True
+                    return cell
+        return None
 
     def check_bingo(self):
         # rows
@@ -86,6 +99,9 @@ class Board:
             return True
         return False
 
+# -------------------
+# MAIN GAME CLASS
+# -------------------
 class BingoGame:
     def __init__(self):
         self.player_board = Board(SIZE, (MARGIN, 100))
@@ -95,59 +111,190 @@ class BingoGame:
         random.shuffle(self.all_numbers)
         self.current_number = None
         self.winner = None
+        self.player_lives = 3
+        self.bot_lives = 3
+        self.block_message = None
+        self.block_timer = 0
+        self.fire_message = None
+        self.fire_timer = 0
+        self.game_over = False
+        self.winner = None
 
+        self.player_late = 0
+        self.bot_late = 0
+        self.late_message = None
+        self.late_timer = 0
+
+
+        # 🎯 Skill Numbers (ไม่ซ้ำกัน)
+        self.player_skills = random.sample(range(1, SIZE*SIZE*2), 5)
+        self.bot_skills = random.sample(
+            [n for n in range(1, SIZE*SIZE*2) if n not in self.player_skills], 5
+        )
+
+    # -------------------
+    # ACTIONS
+    # -------------------
     def next_number(self):
         if self.all_numbers:
             self.current_number = self.all_numbers.pop(0)
             self.called_numbers.append(self.current_number)
-            self.bot_board.mark_number(self.current_number)
+
+            # Bot marks number
+            bot_cell = self.bot_board.mark_number(self.current_number)
+            if bot_cell:
+                # ถ้าเจอช่องบล็อก
+                if bot_cell.type == "block":
+                    self.trigger_block(self.player_board)
+
+                # ถ้าเป็น Skill → Fire!
+                if self.current_number in self.bot_skills:
+                    self.trigger_fire("player")
+
             if self.bot_board.check_bingo() and not self.winner:
-                self.winner = "Bot ชนะ!"
+                self.winner = "🤖 Bot Wins!"
 
     def player_mark(self, pos):
-        for i,row in enumerate(self.player_board.cells):
-            for j,cell in enumerate(row):
-                if cell.rect.collidepoint(pos):
-                    if cell.number == self.current_number:
+        for row in self.player_board.cells:
+            for cell in row:
+                if cell.rect.collidepoint(pos) and not cell.blocked:
+                    # ✅ วงย้อนหลังได้ทุกเลขที่เคยสุ่มแล้ว
+                    if cell.number in self.called_numbers:
                         cell.marked = True
-                        if self.player_board.check_bingo() and not self.winner:
-                            self.winner = "Player ชนะ!"
 
+                        # ถ้าเป็น block → block ฝั่งตรงข้าม
+                        if cell.type == "block":
+                            self.trigger_block(self.bot_board)
+
+                        # ถ้าเป็น skill → ยิงหัวใจ
+                        if cell.number in self.player_skills:
+                            self.trigger_fire("bot")
+
+                        if self.player_board.check_bingo() and not self.winner:
+                            self.winner = "😎 Player Wins!"
+
+    def trigger_block(self, board):
+        candidates = [cell for row in board.cells for cell in row if not cell.blocked]
+        if candidates:
+            blocked_cell = random.choice(candidates)
+            blocked_cell.blocked = True
+            blocked_cell.marked = False  # 💥 ถ้าเคยวงไว้ ให้หายเมื่อถูก block
+            self.block_message = f"🚫 BLOCKED {blocked_cell.number}"
+            self.block_timer = pygame.time.get_ticks()
+
+    def trigger_fire(self, target):
+        if target == "bot":
+            if self.bot_lives > 0:
+                self.bot_lives -= 1
+                if self.bot_lives == 0:
+                    self.game_over = True
+                    self.winner = "Player"
+        else:
+            if self.player_lives > 0:
+                self.player_lives -= 1
+                if self.player_lives == 0:
+                    self.game_over = True
+                    self.winner = "Bot"
+
+        self.fire_message = f"🔥 FIRE to {target.upper()}!"
+        self.fire_timer = pygame.time.get_ticks()
+    
+    def trigger_late_up(self, board_name):
+        if board_name == "player":
+            self.player_late += 1
+            self.late_message = "PLAYER LATE UP!"
+        elif board_name == "bot":
+            self.bot_late += 1
+            self.late_message = "BOT LATE UP!"
+        self.late_timer = pygame.time.get_ticks()
+
+    def trigger_late_down(self, board_name):
+        if board_name == "player":
+            self.bot_late = max(0, self.bot_late - 1)
+            self.late_message = "BOT LATE DOWN!"
+        elif board_name == "bot":
+            self.player_late = max(0, self.player_late - 1)
+            self.late_message = "PLAYER LATE DOWN!"
+        self.late_timer = pygame.time.get_ticks()
+
+
+    def draw_hearts(self, surface, lives, position):
+        x, y = position
+        for i in range(lives):
+            pygame.draw.polygon(surface, RED, [
+                (x+i*30, y+10), (x+10+i*30, y), (x+20+i*30, y+10), (x+10+i*30, y+20)
+            ])
+
+    # -------------------
+    # DRAWING
+    # -------------------
     def draw(self, surface):
         surface.fill(WHITE)
-        # ชื่อ
+
+        # Titles
         player_text = font.render("Player", True, BLACK)
         surface.blit(player_text, player_text.get_rect(center=(MARGIN + SIZE*CELL_SIZE//2, 60)))
         bot_text = font.render("Bot", True, BLACK)
         surface.blit(bot_text, bot_text.get_rect(center=(SIZE*CELL_SIZE + MARGIN*2 + GAP + SIZE*CELL_SIZE//2, 60)))
 
-        # board
+        # Boards
         self.player_board.draw(surface)
         self.bot_board.draw(surface)
 
-        # เลขสุ่ม
+        # Hearts
+        self.draw_hearts(surface, self.player_lives, (MARGIN, 100 + SIZE*CELL_SIZE + 10))
+        self.draw_hearts(surface, self.bot_lives, (SIZE*CELL_SIZE + MARGIN*2 + GAP, 100 + SIZE*CELL_SIZE + 10))
+
+        # Lucky Number
         if self.current_number:
             offset = 5 * (pygame.time.get_ticks()//400 % 2)
-            text = font.render(f"lucky number: {self.current_number}", True, BLUE)
-            # x_center = ตรงกลางระหว่างสองบอร์ด
+            text = font.render(f"🎲 Lucky Number: {self.current_number}", True, BLUE)
             player_right = MARGIN + SIZE*CELL_SIZE
             bot_left = SIZE*CELL_SIZE + MARGIN*2 + GAP
             x_center = (player_right + bot_left) // 2
             surface.blit(text, text.get_rect(center=(x_center, 40 + offset)))
 
-        # Victory
+        # Block message
+        if self.block_message and pygame.time.get_ticks() - self.block_timer < 3000:
+            msg_text = font.render(self.block_message, True, RED)
+            surface.blit(msg_text, msg_text.get_rect(center=(SCREEN_WIDTH//2, 100)))
+        else:
+            self.block_message = None
+
+        # Fire message
+        if self.fire_message and pygame.time.get_ticks() - self.fire_timer < 3000:
+            fire_text = font.render(self.fire_message, True, RED)
+            surface.blit(fire_text, fire_text.get_rect(center=(SCREEN_WIDTH//2, 140)))
+        else:
+            self.fire_message = None
+
+        # Winner
         if self.winner:
             win_text = big_font.render(self.winner, True, GREEN)
-            win_rect = win_text.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2))
-            surface.blit(win_text, win_rect)
+            surface.blit(win_text, win_text.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2)))
 
-        # แสดงเลขที่สุ่มไปแล้ว
+        # Called numbers (recent 15)
         y_offset = 50
         x_offset = SCREEN_WIDTH - 180
         for num in self.called_numbers[-15:]:
             num_text = small_font.render(str(num), True, BLACK)
             surface.blit(num_text, (x_offset, y_offset))
             y_offset += 25
+
+        # Skills
+        p_skill_text = small_font.render(f"Player Skill: {self.player_skills}", True, BLUE)
+        b_skill_text = small_font.render(f"Bot Skill: {self.bot_skills}", True, RED)
+        surface.blit(p_skill_text, (MARGIN, SCREEN_HEIGHT - 80))
+        surface.blit(b_skill_text, (SIZE*CELL_SIZE + MARGIN*2 + GAP, SCREEN_HEIGHT - 80))
+
+        if self.game_over:
+            msg = f"{self.winner} Wins!" if self.winner else "Game Over!"
+            text = font.render(msg, True, RED)
+            surface.blit(text, text.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2)))
+            pygame.display.flip()
+            pygame.time.wait(3000)
+            pygame.quit()
+            sys.exit()
 
     def restart(self):
         self.__init__()
@@ -169,14 +316,17 @@ while running:
 
         if event.type == pygame.MOUSEBUTTONDOWN:
             game.player_mark(event.pos)
-            # Restart button
             restart_rect = pygame.Rect(SCREEN_WIDTH-150, SCREEN_HEIGHT-50, 120, 40)
             if restart_rect.collidepoint(event.pos):
                 game.restart()
 
+        if event.type == pygame.VIDEORESIZE:
+            SCREEN_WIDTH, SCREEN_HEIGHT = event.w, event.h
+            screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.FULLSCREEN | pygame.RESIZABLE)
+
     game.draw(screen)
 
-    # ปุ่ม Restart
+    # Restart Button
     restart_rect = pygame.Rect(SCREEN_WIDTH-150, SCREEN_HEIGHT-50, 120, 40)
     pygame.draw.rect(screen, (0,120,255), restart_rect)
     restart_text = small_font.render("Restart", True, WHITE)
