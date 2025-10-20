@@ -36,7 +36,7 @@ class Cell:
         self.type = type   # normal / block
         self.blocked = False
 
-    def draw(self, surface, late_up_numbers=[], late_down_numbers=[]):
+    def draw(self, surface):
         color = (200,200,200)
         if self.blocked:
             color = (150,150,150)
@@ -71,10 +71,10 @@ class Board:
                 row.append(Cell(numbers[idx], rect, cell_type))
             self.cells.append(row)
 
-    def draw(self, surface, late_up_numbers=[], late_down_numbers=[]):
+    def draw(self, surface):
         for row in self.cells:
             for cell in row:
-                cell.draw(surface, late_up_numbers, late_down_numbers)
+                cell.draw(surface)
 
     def mark_number(self, num):
         for row in self.cells:
@@ -120,22 +120,34 @@ class BingoGame:
         self.fire_timer = 0
         self.late_message = None
         self.late_timer = 0
+        self.heal_message = None
+        self.heal_timer = 0
         self.game_over = False
 
         self.player_late = 0
         self.bot_late = 0
 
-        # 🎯 Skill Numbers
+        # Skill Numbers
         self.player_skills = random.sample(range(1, SIZE*SIZE*2), 5)
         self.bot_skills = random.sample(
             [n for n in range(1, SIZE*SIZE*2) if n not in self.player_skills], 5
         )
 
-        # ✅ Late numbers
+        # Late numbers
         self.late_up_numbers = random.sample(self.all_numbers, 3)
         self.late_down_numbers = random.sample(
             [n for n in self.all_numbers if n not in self.late_up_numbers], 3
         )
+
+        # Heal numbers
+        self.heal_numbers = random.sample(
+            [n for n in self.all_numbers if n not in self.late_up_numbers+self.late_down_numbers],
+            5
+        )
+
+        # Block selection
+        self.block_selecting = False
+        self.block_target_board = None
 
     # -------------------
     # ACTIONS
@@ -156,28 +168,45 @@ class BingoGame:
                 # Fire
                 if self.current_number in self.bot_skills:
                     self.trigger_fire("player")
+                # Heal
+                if self.current_number in self.heal_numbers:
+                    self.trigger_heal("bot")
 
             if self.bot_board.check_bingo() and not self.winner:
                 self.winner = "Bot Wins!"
 
     def player_mark(self, pos):
-        for row in self.player_board.cells:
-            for cell in row:
-                if cell.rect.collidepoint(pos) and not cell.blocked:
-                    # ✅ วงได้เฉพาะเลขที่เคยออกแล้ว (รวมถึงเลขที่ผ่านมา)
-                    if self.called_numbers and cell.number in self.called_numbers:
-                        cell.marked = True
-                        # Late Check
-                        self.check_late_numbers(cell.number, "player")
-                        # Block
-                        if cell.type == "block":
-                            self.trigger_block(self.bot_board)
-                        # Fire
-                        if cell.number in self.player_skills:
-                            self.trigger_fire("bot")
-
-                        if self.player_board.check_bingo() and not self.winner:
-                            self.winner = "Player Wins!"
+        # ถ้าอยู่ในโหมดเลือก block
+        if self.block_selecting and self.block_target_board == self.bot_board:
+            for row in self.bot_board.cells:
+                for cell in row:
+                    if cell.rect.collidepoint(pos) and not cell.blocked:
+                        cell.blocked = True
+                        cell.marked = False
+                        self.block_message = f"BLOCKED {cell.number}"
+                        self.block_timer = pygame.time.get_ticks()
+                        self.block_selecting = False
+                        self.block_target_board = None
+                        return
+        else:
+            for row in self.player_board.cells:
+                for cell in row:
+                    if cell.rect.collidepoint(pos) and not cell.blocked:
+                        if self.called_numbers and cell.number in self.called_numbers:
+                            cell.marked = True
+                            self.check_late_numbers(cell.number, "player")
+                            if cell.type == "block":
+                                # โหมดเลือกช่อง Bot
+                                self.block_selecting = True
+                                self.block_target_board = self.bot_board
+                                self.block_message = "CHOOSE TO BLOCK"
+                                self.block_timer = pygame.time.get_ticks()
+                            if cell.number in self.player_skills:
+                                self.trigger_fire("bot")
+                            if cell.number in self.heal_numbers:
+                                self.trigger_heal("player")
+                            if self.player_board.check_bingo() and not self.winner:
+                                self.winner = "Player Wins!"
 
     def trigger_block(self, board):
         candidates = [cell for row in board.cells for cell in row if not cell.blocked]
@@ -192,18 +221,19 @@ class BingoGame:
         if target == "bot":
             if self.bot_lives > 0:
                 self.bot_lives -= 1
-                if self.bot_lives == 0:
-                    self.game_over = True
-                    self.winner = "Player"
         else:
             if self.player_lives > 0:
                 self.player_lives -= 1
-                if self.player_lives == 0:
-                    self.game_over = True
-                    self.winner = "Bot"
-
         self.fire_message = f"🔥 FIRE to {target.upper()}!"
         self.fire_timer = pygame.time.get_ticks()
+
+    def trigger_heal(self, target):
+        if target == "player":
+            self.player_lives = min(3, self.player_lives+1)
+        else:
+            self.bot_lives = min(3, self.bot_lives+1)
+        self.heal_message = f"💚 HEAL {target.upper()}!"
+        self.heal_timer = pygame.time.get_ticks()
 
     def trigger_late_up(self, board_name):
         if board_name == "player":
@@ -216,10 +246,10 @@ class BingoGame:
 
     def trigger_late_down(self, board_name):
         if board_name == "player":
-            self.bot_late = max(0, self.bot_late - 1)
+            self.bot_late = max(0, self.bot_late-1)
             self.late_message = "BOT LATE DOWN!"
         elif board_name == "bot":
-            self.player_late = max(0, self.player_late - 1)
+            self.player_late = max(0, self.player_late-1)
             self.late_message = "PLAYER LATE DOWN!"
         self.late_timer = pygame.time.get_ticks()
 
@@ -249,8 +279,8 @@ class BingoGame:
         surface.blit(bot_text, bot_text.get_rect(center=(SIZE*CELL_SIZE + MARGIN*2 + GAP + SIZE*CELL_SIZE//2, 60)))
 
         # Boards
-        self.player_board.draw(surface, self.late_up_numbers, self.late_down_numbers)
-        self.bot_board.draw(surface, self.late_up_numbers, self.late_down_numbers)
+        self.player_board.draw(surface)
+        self.bot_board.draw(surface)
 
         # Hearts
         self.draw_hearts(surface, self.player_lives, (MARGIN, 100 + SIZE*CELL_SIZE + 10))
@@ -265,31 +295,40 @@ class BingoGame:
             x_center = (player_right + bot_left) // 2
             surface.blit(text, text.get_rect(center=(x_center, 40 + offset)))
 
-        # Messages -----------------
-        if self.block_message and pygame.time.get_ticks() - self.block_timer < 3000:
+        # Messages
+        now = pygame.time.get_ticks()
+        if self.block_message and now - self.block_timer < 3000:
             msg_text = font.render(self.block_message, True, RED)
             surface.blit(msg_text, msg_text.get_rect(center=(SCREEN_WIDTH//2, 100)))
         else:
-            self.block_message = None
+            if not self.block_selecting:
+                self.block_message = None
 
-        if self.fire_message and pygame.time.get_ticks() - self.fire_timer < 3000:
+        if self.fire_message and now - self.fire_timer < 3000:
             fire_text = font.render(self.fire_message, True, ORANGE)
             surface.blit(fire_text, fire_text.get_rect(center=(SCREEN_WIDTH//2, 140)))
         else:
             self.fire_message = None
 
-        if self.late_message and pygame.time.get_ticks() - self.late_timer < 3000:
-            late_text = font.render(self.late_message, True, BLACK)
+        if self.late_message and now - self.late_timer < 3000:
+            color = BLUE if "UP" in self.late_message else RED
+            late_text = font.render(self.late_message, True, color)
             surface.blit(late_text, late_text.get_rect(center=(SCREEN_WIDTH//2, 180)))
         else:
             self.late_message = None
+
+        if self.heal_message and now - self.heal_timer < 3000:
+            heal_text = font.render(self.heal_message, True, GREEN)
+            surface.blit(heal_text, heal_text.get_rect(center=(SCREEN_WIDTH//2, 220)))
+        else:
+            self.heal_message = None
 
         # Winner
         if self.winner:
             win_text = big_font.render(self.winner, True, GREEN)
             surface.blit(win_text, win_text.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2)))
 
-        # Called numbers (recent 15)
+        # Called numbers
         y_offset = 50
         x_offset = SCREEN_WIDTH - 180
         for num in self.called_numbers[-15:]:
@@ -302,15 +341,6 @@ class BingoGame:
         b_skill_text = small_font.render(f"Bot Skill: {self.bot_skills}", True, RED)
         surface.blit(p_skill_text, (MARGIN, SCREEN_HEIGHT - 80))
         surface.blit(b_skill_text, (SIZE*CELL_SIZE + MARGIN*2 + GAP, SCREEN_HEIGHT - 80))
-
-        if self.game_over:
-            msg = f"{self.winner} Wins!" if self.winner else "Game Over!"
-            text = font.render(msg, True, RED)
-            surface.blit(text, text.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2)))
-            pygame.display.flip()
-            pygame.time.wait(3000)
-            pygame.quit()
-            sys.exit()
 
     def restart(self):
         self.__init__()
