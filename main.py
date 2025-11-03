@@ -128,6 +128,11 @@ class BingoGame:
         self.late_timer = 0
         self.heal_message = None
         self.heal_timer = 0
+
+        # NEW: remove mark message/timer
+        self.remove_message = None
+        self.remove_timer = 0
+
         self.game_over = False
 
         self.player_late = 0
@@ -151,9 +156,21 @@ class BingoGame:
             5
         )
 
+        # Remove Mark numbers (new skill) - ensure no overlap with existing skills
+        used = set(self.player_skills + self.bot_skills + self.late_up_numbers + self.late_down_numbers + self.heal_numbers)
+        pool_for_remove = [n for n in range(1, SIZE*SIZE*2) if n not in used]
+        # if pool is smaller than 5, reduce accordingly (defensive)
+        remove_count = min(5, len(pool_for_remove))
+        self.remove_mark_numbers = random.sample(pool_for_remove, remove_count)
+
         # Block selection
         self.block_selecting = False
         self.block_target_board = None
+
+        # Remove-selecting (player chooses which marked bot cell to unmark)
+        self.remove_selecting = False
+        self.remove_target_board = None
+        self.remove_trigger_number = None  # store which remove-mark number triggered selection
 
     # -------------------
     # ACTIONS
@@ -177,12 +194,37 @@ class BingoGame:
                 # Heal
                 if self.current_number in self.heal_numbers:
                     self.trigger_heal("bot")
+                # Remove Mark (bot case) -> random remove on player
+                if self.current_number in self.remove_mark_numbers:
+                    self.trigger_remove_mark("bot", self.current_number)
 
             if self.bot_board.check_bingo() and not self.winner:
                 self.winner = "Bot Wins!"
 
     def player_mark(self, pos):
-        # ถ้าอยู่ในโหมดเลือก block
+        # If we are in remove-selecting mode (player must choose a marked bot cell to unmark)
+        if self.remove_selecting and self.remove_target_board == self.bot_board:
+            for row in self.bot_board.cells:
+                for cell in row:
+                    if cell.rect.collidepoint(pos) and cell.marked and not cell.blocked:
+                        # Unmark that bot cell
+                        cell.marked = False
+                        # Message
+                        self.remove_message = f"Removed mark {cell.number} from Bot!"
+                        self.remove_timer = pygame.time.get_ticks()
+                        # Return the trigger number back into pool so it can be drawn again later
+                        if self.remove_trigger_number is not None:
+                            self.all_numbers.append(self.remove_trigger_number)
+                            random.shuffle(self.all_numbers)
+                        # Reset selecting state
+                        self.remove_selecting = False
+                        self.remove_target_board = None
+                        self.remove_trigger_number = None
+                        return
+            # If clicked not a valid marked cell, ignore (stay in remove-selecting until valid click)
+            return
+
+        # If we are in block-selecting mode as before
         if self.block_selecting and self.block_target_board == self.bot_board:
             for row in self.bot_board.cells:
                 for cell in row:
@@ -194,25 +236,35 @@ class BingoGame:
                         self.block_selecting = False
                         self.block_target_board = None
                         return
-        else:
-            for row in self.player_board.cells:
-                for cell in row:
-                    if cell.rect.collidepoint(pos) and not cell.blocked:
-                        if self.called_numbers and cell.number in self.called_numbers:
-                            cell.marked = True
-                            self.check_late_numbers(cell.number, "player")
-                            if cell.type == "block":
-                                # โหมดเลือกช่อง Bot
-                                self.block_selecting = True
-                                self.block_target_board = self.bot_board
-                                self.block_message = "CHOOSE TO BLOCK"
-                                self.block_timer = pygame.time.get_ticks()
-                            if cell.number in self.player_skills:
-                                self.trigger_fire("bot")
-                            if cell.number in self.heal_numbers:
-                                self.trigger_heal("player")
-                            if self.player_board.check_bingo() and not self.winner:
-                                self.winner = "Player Wins!"
+            return  # clicked elsewhere during block selecting -> ignore
+
+        # Normal player marking flow
+        for row in self.player_board.cells:
+            for cell in row:
+                if cell.rect.collidepoint(pos) and not cell.blocked:
+                    if self.called_numbers and cell.number in self.called_numbers:
+                        cell.marked = True
+                        self.check_late_numbers(cell.number, "player")
+                        if cell.type == "block":
+                            # block-select mode for player to choose bot cell to block
+                            self.block_selecting = True
+                            self.block_target_board = self.bot_board
+                            self.block_message = "CHOOSE TO BLOCK"
+                            self.block_timer = pygame.time.get_ticks()
+                        if cell.number in self.player_skills:
+                            self.trigger_fire("bot")
+                        if cell.number in self.heal_numbers:
+                            self.trigger_heal("player")
+                        # New: if the player marked a remove-mark number -> enter remove-selecting mode
+                        if cell.number in self.remove_mark_numbers:
+                            # Player may choose one marked cell on bot_board to unmark
+                            self.remove_selecting = True
+                            self.remove_target_board = self.bot_board
+                            self.remove_trigger_number = cell.number
+                            self.remove_message = "REMOVE MARK! Choose Bot's marked cell"
+                            self.remove_timer = pygame.time.get_ticks()
+                        if self.player_board.check_bingo() and not self.winner:
+                            self.winner = "Player Wins!"
 
     def trigger_block(self, board):
         candidates = [cell for row in board.cells for cell in row if not cell.blocked]
@@ -258,6 +310,33 @@ class BingoGame:
             self.player_late = max(0, self.player_late-1)
             self.late_message = "PLAYER LATE DOWN!"
         self.late_timer = pygame.time.get_ticks()
+
+    def trigger_remove_mark(self, board_name, number_used):
+        """
+        If player used remove-mark: set selecting mode for player to choose a marked bot cell to remove.
+        If bot used remove-mark: randomly remove one marked player cell.
+        After use, put the remove-mark number back into pool (all_numbers) so it can be drawn again later.
+        """
+        if board_name == "player":
+            # Player will choose which bot marked cell to remove (handled in player_mark)
+            self.remove_selecting = True
+            self.remove_target_board = self.bot_board
+            self.remove_trigger_number = number_used
+            self.remove_message = "REMOVE MARK! Choose Bot's marked cell"
+            self.remove_timer = pygame.time.get_ticks()
+        else:
+            # Bot removes one random marked cell from player_board (if any)
+            player_marked_cells = [cell for row in self.player_board.cells for cell in row if cell.marked and not cell.blocked]
+            if player_marked_cells:
+                removed = random.choice(player_marked_cells)
+                removed.marked = False
+                self.remove_message = f"BOT removed Player mark {removed.number}!"
+            else:
+                self.remove_message = "BOT tried Remove Mark but Player had no marks!"
+            self.remove_timer = pygame.time.get_ticks()
+            # Return the number back into all_numbers so it can be drawn again
+            self.all_numbers.append(number_used)
+            random.shuffle(self.all_numbers)
 
     def check_late_numbers(self, number, board_name):
         if number in self.late_up_numbers:
@@ -329,6 +408,15 @@ class BingoGame:
         else:
             self.heal_message = None
 
+        # Remove mark message
+        if self.remove_message and now - self.remove_timer < 3000:
+            remove_text = font.render(self.remove_message, True, (128, 0, 128))  # purple text
+            surface.blit(remove_text, remove_text.get_rect(center=(SCREEN_WIDTH//2, 260)))
+        else:
+            # if we were in remove-selecting but timer expired, cancel selecting mode
+            if not self.remove_selecting:
+                self.remove_message = None
+
         # Winner
         if self.winner:
             win_text = big_font.render(self.winner, True, GREEN)
@@ -342,7 +430,7 @@ class BingoGame:
             surface.blit(num_text, (x_offset, y_offset))
             y_offset += 25
 
-        # Skills
+        # Skills (kept as before)
         p_skill_text = small_font.render(f"Player Skill: {self.player_skills}", True, BLUE)
         b_skill_text = small_font.render(f"Bot Skill: {self.bot_skills}", True, RED)
         surface.blit(p_skill_text, (MARGIN, SCREEN_HEIGHT - 80))
