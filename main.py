@@ -8,6 +8,45 @@ pygame.init()
 
 # ------------------- CONFIG -------------------
 
+# ------------------- BACKGROUND MUSIC -------------------
+try:
+    pygame.mixer.init()
+    pygame.mixer.music.load("sounds/pirates-action-loop-368853.mp3")  # ใส่ path เพลงของนายเอง
+    pygame.mixer.music.set_volume(0.5)  # ปรับความดัง (0.0 - 1.0)
+    pygame.mixer.music.play(-1)  # -1 = เล่นวนไม่หยุด
+except Exception as e:
+    print("เล่นเพลงพื้นหลังไม่ได้:", e)
+
+win_sound = pygame.mixer.Sound("sounds/you-win-sequence-1-183948 (1).mp3")
+lose_sound = pygame.mixer.Sound("sounds/game-over-417465.mp3")
+win_sound.set_volume(1.0)
+lose_sound.set_volume(1.0)
+
+# ------------------- SFX (Skill Sounds) -------------------
+SFX = {}
+
+def load_sfx(name, path, volume=0.6):
+    try:
+        s = pygame.mixer.Sound(path)
+        s.set_volume(volume)
+        SFX[name] = s
+    except Exception as e:
+        print(f"โหลดเสียง {name} ไม่ได้:", e)
+
+# ใส่ path ของเสียงแต่ละสกิล
+load_sfx("block", "sounds/error-010-206498.mp3")
+load_sfx("fire", "sounds/single-gunshot-62-hp-37188.mp3")
+load_sfx("heal", "sounds/coin-clatter-6-87110.mp3")
+load_sfx("remove", "sounds/vd1h39gep6-pirate-sfx-2.mp3")
+load_sfx("Rate Up", "sounds/game-bonus-144751.mp3")
+load_sfx("latedown", "sounds/fail-234710.mp3")
+
+def play_sfx(name):
+    s = SFX.get(name)
+    if s:
+        s.play()
+
+
 # ==== TEXT HELPER ====
 NAME = {"player": "ผู้เล่น", "bot": "T - T"}
 def say(actor, action, target=None):
@@ -16,58 +55,8 @@ def say(actor, action, target=None):
         return f"{left} : {action}"
     right = NAME.get(target, str(target))
     return f"{left} → {right} : {action}"
-# ================================================
+# =====================
 
-# ------------------- BACKGROUND MUSIC -------------------
-try:
-    pygame.mixer.init()
-    pygame.mixer.music.load("sounds/pirates-action-loop-368853.mp3")  # ใส่ path ของเพลง
-    pygame.mixer.music.set_volume(0.3)         # ระดับเสียง (0.0 - 1.0)
-    pygame.mixer.music.play(-1)                # เล่นวนลูปตลอดเกม
-
-    win_sound  = pygame.mixer.Sound("sounds/you-win-sequence-1-183948.mp3")
-    lose_sound = pygame.mixer.Sound("sounds/game-over-417465.mp3")
-    win_sound.set_volume(0.6)
-    lose_sound.set_volume(0.6)
-    print("🎵 Background music started")
-except Exception as e:
-    print("⚠️ โหลดเพลงไม่สำเร็จ:", e)
-# ===========================================================
-
-# ------------------- SFX (Skill Sounds) -------------------
-try:
-    if not pygame.mixer.get_init():
-        pygame.mixer.init()
-
-    SFX = {}
-
-    def load_sfx(name, path, volume=0.65):
-        try:
-            s = pygame.mixer.Sound(path)
-            s.set_volume(volume)
-            SFX[name] = s
-        except Exception as e:
-            print(f"⚠️ โหลดเสียง {name} ไม่สำเร็จ:", e)
-
-    # โหลดไฟล์ (แก้พาธตามที่คุณวางไฟล์)
-    load_sfx("block",    "sounds/game-bonus-144751.mp3")
-    load_sfx("fire",     "sounds/single-gunshot-62-hp-37188.mp3")
-    load_sfx("heal",     "sounds/coin-clatter-6-87110.mp3")
-    load_sfx("remove",   "sounds/vd1h39gep6-pirate-sfx-2.mp3")
-    load_sfx("lateup",   "sounds/game-bonus-144751.mp3")
-    load_sfx("latedown", "sounds/game-bonus-144751.mp3")
-    load_sfx("skill_any","sounds/game-bonus-144751.mp3") 
-
-    def play_sfx(name):
-        s = SFX.get(name) or SFX.get("skill_any")
-        if s:
-            s.play()
-except Exception as e:
-    print("⚠️ ตั้งค่าเสียงไม่สำเร็จ:", e)
-
-# =========================================================
-
-# ตำแหน่ง recent box
 Box_recent_number_x = +173
 Box_recent_number_y = +131.7
 
@@ -84,8 +73,7 @@ BOT_HEART_OFFSET    = [5, -70]
 
 PLAYER_POS_OFFSET = [-10, 160]
 BOT_POS_OFFSET    = [100, 120]
-SHOW_CENTER_STATUS = False
-
+SHOW_CENTER_STATUS = True
 SIZE = 5
 CELL_SIZE = 50
 GRID_GAP = 6
@@ -98,7 +86,7 @@ BLACK  = (0, 0, 0)
 YELLOW = (255, 255, 150)
 
 PANEL_BG     = (250, 250, 250)
-PANEL_BORDER = (235, 210, 160)
+PANEL_BORDER = (214, 164, 84)
 PANEL_SHADOW = (0, 0, 0, 60)
 
 PASTEL_FIRE     = (255,179,186)
@@ -152,8 +140,7 @@ def load_font(file_name, size, fallback=None):
 FONT_TH_BODY   = load_font("Mitr-Bold.ttf", 22, fallback="kanit")
 FONT_TH_TITLE  = load_font("Mitr-Bold.ttf", 36, fallback="kanit")
 FONT_EN_BODY   = load_font("Kitora-Demo.otf", 22, fallback="arial")
-FONT_EN_TITLE  = load_font("Kitora-Demo.otf", 50, fallback="arial")
-
+FONT_EN_TITLE  = load_font("Kitora-Demo.otf", 30, fallback="arial")
 
 # ฟอนต์เลขในเซล
 PREFERRED_NUM_FONT_FILE = "SuperAdorable-MAvyp.ttf"
@@ -298,9 +285,9 @@ def update_skill_timer(clear_all=False):
         skill_timer.clear()
 
 # กล่องเหลือง "คงขนาด/ตำแหน่ง" จากจอเริ่มต้น
-SKILL_FIXED_W = 300
+SKILL_FIXED_W = 310
 SKILL_FIXED_H = 275
-SKILL_PANEL_RECT = [INIT_SCREEN_WIDTH - SKILL_FIXED_W - 395, 530, SKILL_FIXED_W, SKILL_FIXED_H]
+SKILL_PANEL_RECT = [INIT_SCREEN_WIDTH - SKILL_FIXED_W - 390, 530, SKILL_FIXED_W, SKILL_FIXED_H]
 
 def draw_skill_descriptions():
     x, y, w, h = SKILL_PANEL_RECT
@@ -314,7 +301,7 @@ def draw_skill_descriptions():
 
     title_font = pick_font("title", "Skill")
     title = title_font.render("Skill", True, BLACK)
-    screen.blit(title, (x + 18, y + 5))
+    screen.blit(title, (x + 18, y + 10))
 
     body_font = pick_font("body", "ตัวอย่าง")
     yy = y + 54
@@ -334,8 +321,8 @@ show_help = False
 
 def layout_update_buttons():
     global RESET_BTN_RECT, HELP_BTN_RECT
-    reset_w, reset_h = 130, 48
-    help_w, help_h   = 130, 48
+    reset_w, reset_h = 140, 48
+    help_w, help_h   = 140, 48
     margin_x, margin_y = 5, 40
 
     reset_x = SCREEN_WIDTH - reset_w - margin_x
@@ -361,9 +348,9 @@ HELP_TEXT = [
     "• สกิล:",
     "   - block: บล็อกช่องฝั่งตรงข้าม",
     "   - fire: โจมตี -1 (หัวใจ)",
-    "   - heal: ฟื้น +1(หัวใจ) ",
+    "   - heal: ฟื้น +1 (หัวใจ)",
     "   - remove: ลบเครื่องหมายของอีกฝั่ง",
-    "   - lateup/latedown: ดัน/ถ่วงเลขในคิว",
+    "   - Rateup/Ratedown: ดัน/ถ่วงเลขในคิว",
     "• ปุ่มลัด: R รีเซ็ต, H คู่มือ, +/- ย่อ/ขยายปู",
     "• ปิดคู่มือ: คลิกที่ฉาก/กด ESC"
 ]
@@ -377,8 +364,8 @@ def draw_help_panel(surface):
     dim.fill((0, 0, 0, 120))
     surface.blit(dim, (0, 0))
 
-    pygame.draw.rect(surface, (255, 242, 189), (x, y, w, h), border_radius=18)
-    pygame.draw.rect(surface, (214, 164, 84), (x, y, w, h), width=6, border_radius=18)
+    pygame.draw.rect(surface, (255, 255, 200), (x, y, w, h), border_radius=18)
+    pygame.draw.rect(surface, PANEL_BORDER, (x, y, w, h), width=4, border_radius=18)
 
     title_surf = pick_font("title", "วิธีเล่น").render("วิธีเล่น", True, BLACK)
     surface.blit(title_surf, (x + 18, y + 16))
@@ -392,7 +379,7 @@ def draw_help_panel(surface):
             yy += body_font.get_height() + 4
 
 def draw_result_popup(surface, winner_text):
-    """วาดหน้าต่างแจ้งผลกลางจอ พร้อมคืน rect ของปุ่มรีเซ็ต (ไม่ตรวจคลิกที่นี่)"""
+    """วาดหน้าต่างแจ้งผลกลางจอ พร้อมปุ่มรีเซ็ต"""
     w, h = 480, 240
     x = (SCREEN_WIDTH - w)//2
     y = (SCREEN_HEIGHT - h)//2
@@ -406,7 +393,7 @@ def draw_result_popup(surface, winner_text):
     pygame.draw.rect(surface, (255, 255, 210), (x, y, w, h), border_radius=18)
     pygame.draw.rect(surface, (230, 210, 150), (x, y, w, h), width=4, border_radius=18)
 
-    # ข้อความผู้ชนะ/ผู้แพ้
+    # ข้อความผู้ชนะ
     f_title = pick_font("title", "จบเกม")
     text = " " + winner_text + " "
     title_surf = f_title.render(text, True, (30, 30, 30))
@@ -421,10 +408,18 @@ def draw_result_popup(surface, winner_text):
     mouse_over = btn_rect.collidepoint(pygame.mouse.get_pos())
     draw_button(surface, btn_rect, "รีเซ็ตเกมใหม่ (R)", hovered=mouse_over)
 
-    return btn_rect
+    # ตรวจจับคลิก
+    if pygame.mouse.get_pressed()[0]:
+        if btn_rect.collidepoint(pygame.mouse.get_pos()):
+            pygame.time.wait(150)  # กันคลิกซ้ำ
+            update_skill_timer(clear_all=True)
+            pygame.time.wait(300)  # รอเสียงเล่นแป๊บหนึ่งก่อนรีเซ็ต
+            return "reset"
+
+    return None
 
 
-
+## เลขปู
 def draw_number_panel(surface, x, y, w, h, number, title="เลขปัจจุบัน"):
     pygame.draw.rect(surface, YELLOW, (x, y, w, h), border_radius=18)
     pygame.draw.rect(surface, PANEL_BORDER, (x, y, w, h), width=4, border_radius=18)
@@ -433,7 +428,7 @@ def draw_number_panel(surface, x, y, w, h, number, title="เลขปัจจ�
         num_text = num_font.render(str(number), True, BLACK)
         num_rect = num_text.get_rect(center=(x + w // 2, y + h // 2 + 20))
         surface.blit(num_text, num_rect)
-
+## เลขที่ออกไปแล้ว
 def draw_history_panel(surface, x, y, w, h, numbers, title="เลขที่ออกแล้ว", cols=7, pad=16, gap=10):
 
     shadow = pygame.Surface((w + 6, h + 6), pygame.SRCALPHA)
@@ -445,7 +440,7 @@ def draw_history_panel(surface, x, y, w, h, numbers, title="เลขที่�
 
     title_font = pick_font("title", title)
     title_surf = title_font.render(title, True, BLACK)
-    surface.blit(title_surf, (x + pad, y + pad-10))
+    surface.blit(title_surf, (x + pad, y + pad-5))
 
     top = y + pad + title_surf.get_height() + 6
     left = x + pad
@@ -492,6 +487,7 @@ class Cell:
         self.marked = False
         self.rect = rect
         self.blocked = False
+        self.skill_used = False
 
     def draw(self, surface, num_font, base_size):
         color_map = {
@@ -514,7 +510,7 @@ class Cell:
 class Board:
     def __init__(self, size, position, numbers_skills, cell_size=50, grid_offset=(0, 0)):
         self.size = size
-        self.position = position  # (grid_x, grid_y)
+        self.position = position
         self.cell_size = cell_size
         self.grid_offset = grid_offset
         self.cells = []
@@ -576,10 +572,9 @@ class Board:
 class BingoGame:
     def __init__(self):
         self.player_board, self.bot_board = self.generate_boards()
-
+        self.end_sound_played = False
         self.called_numbers = []
-        self.all_numbers = [cell.number for row in self.player_board.cells for cell in row] + \
-                           [cell.number for row in self.bot_board.cells for cell in row]
+        self.all_numbers = list(range(1, 50))
         random.shuffle(self.all_numbers)
 
         self.current_number = None
@@ -625,36 +620,40 @@ class BingoGame:
 
     def generate_boards(self):
         skill_counts = {"fire":5, "block":3, "heal":5, "remove":5, "lateup":2, "latedown":2, "normal":3}
-        def generate_numbers_skills(start_num):
-            nums = list(range(start_num, start_num + SIZE*SIZE))
+        def generate_numbers_skills():
+            nums = list(range(1, 50)) 
             random.shuffle(nums)
+            nums = nums[:SIZE*SIZE]
             skills = []
             for skill, count in skill_counts.items():
                 skills += [skill]*count
             random.shuffle(skills)
             return list(zip(nums, skills))
 
-        player_ns = generate_numbers_skills(1)
-        bot_ns    = generate_numbers_skills(1 + SIZE*SIZE)
+        player_ns = generate_numbers_skills()
+        bot_ns    = generate_numbers_skills()
 
         return (
             Board(SIZE, player_grid_pos, player_ns, cell_size=PLAYER_CELL_SIZE, grid_offset=tuple(PLAYER_GRID_OFFSET)),
             Board(SIZE, bot_grid_pos,    bot_ns,    cell_size=BOT_CELL_SIZE,    grid_offset=tuple(BOT_GRID_OFFSET))
         )
 
+
     def next_number(self):
         if self.all_numbers and not self.winner:
             self.current_number = self.all_numbers.pop(0)
             self.called_numbers.append(self.current_number)
 
-            bot_cell = self.bot_board.mark_number(self.current_number)
-            if bot_cell:
-                self.activate_skill(bot_cell, "bot")
+            # 🔥 เพิ่มโอกาสที่บอทจะพลาด (เช่น 90% จะเล่นได้จริง)
+            if random.random() < 0.9:  
+                bot_cell = self.bot_board.mark_number(self.current_number)
+                if bot_cell:
+                    self.activate_skill(bot_cell, "bot")
+            else:
+                push_skill_desc("T-T ลืมวง")
 
             if self.bot_board.check_bingo() and not self.winner:
                 self.winner = "Bot Wins!"
-                pygame.mixer.music.pause()
-                lose_sound.play()
 
     def player_mark(self, pos):
         if self.winner:
@@ -670,7 +669,8 @@ class BingoGame:
                         self.remove_selecting = False
                         self.remove_target_board = None
                         self.remove_trigger_number = None
-                        push_skill_desc("player remove T - T's mark")
+                        push_skill_desc("ยกเลิก mark ของT-Tสำเร็จ")
+                        play_sfx("remove")
                         return
 
         if self.block_selecting and self.block_target_board == self.bot_board:
@@ -683,7 +683,8 @@ class BingoGame:
                         self.block_timer = pygame.time.get_ticks()
                         self.block_selecting = False
                         self.block_target_board = None
-                        push_skill_desc(f"Block number {cell.number} T-T")
+                        push_skill_desc(f"บล็อกช่อง {cell.number} ของT-T")
+                        # play_sfx("block")
                         return
 
         for row in self.player_board.cells:
@@ -694,11 +695,14 @@ class BingoGame:
                         self.activate_skill(cell, "player")
                         if self.player_board.check_bingo() and not self.winner:
                             self.winner = "Player Wins!"
-                            pygame.mixer.music.pause()   # หยุดเพลงพื้นหลังชั่วคราว
-                            win_sound.play()
 
     # ------------- SKILLS -------------
     def activate_skill(self, cell, owner):
+
+        if cell.skill_used:
+            return
+        cell.skill_used = True
+
         opponent = "bot" if owner=="player" else "player"
 
         if cell.skill=="block":
@@ -707,7 +711,7 @@ class BingoGame:
                 self.block_target_board = self.bot_board
                 self.block_message = "CHOOSE TO BLOCK"
                 self.block_timer = pygame.time.get_ticks()
-                push_skill_desc(say("player", "choose to block bot's number", target="bot"))
+                push_skill_desc(say("player", "เลือกช่องเพื่อบล็อก", target="bot"))
                 play_sfx("block")
             else:
                 self.trigger_block(self.player_board)
@@ -721,14 +725,14 @@ class BingoGame:
             play_sfx("heal")
 
         elif cell.skill=="remove":
+            # play_sfx("remove")
             if owner=="player":
                 self.remove_selecting=True
                 self.remove_target_board=self.bot_board
                 self.remove_trigger_number=cell.number
                 self.remove_message="REMOVE MARK! Choose Bot's marked cell"
                 self.remove_timer=pygame.time.get_ticks()
-                push_skill_desc("choose to remove bot's number")
-                play_sfx("remove")
+                push_skill_desc("เลือกช่องที่บอททำเครื่องหมาย เพื่อยกเลิก")
             else:
                 self.trigger_remove_mark("bot", cell.number)
 
@@ -746,29 +750,25 @@ class BingoGame:
             c=random.choice(candidates)
             c.blocked=True
             c.marked=False
-            push_skill_desc("T-T block player")
+            push_skill_desc("T-Tบล็อกช่องของผู้เล่น")
 
     def trigger_heal(self, target):
         if target == "player":
             self.player_lives = min(3, self.player_lives + 1)
         else:
             self.bot_lives = min(3, self.bot_lives + 1)
-        push_skill_desc(("ผู้เล่น" if target=="player" else "T-T") + " heal +1")
+        push_skill_desc(("ผู้เล่น" if target=="player" else "T-T") + " ฟื้นหัวใจ +1")
 
     def trigger_fire(self, target, attacker):
         if target == "bot":
             self.bot_lives = max(0, self.bot_lives - 1)
             if self.bot_lives == 0:
                 self.winner = "Player Wins!"
-                pygame.mixer.music.pause()   # หยุดเพลงพื้นหลังชั่วคราว
-                win_sound.play()
         else:
             self.player_lives = max(0, self.player_lives - 1)
             if self.player_lives == 0:
                 self.winner = "Bot Wins!"
-                pygame.mixer.music.pause()
-                lose_sound.play()
-        push_skill_desc(say(attacker, "โจมตี -1 ❤️", target=target))
+        push_skill_desc(say(attacker, "โจมตี -1", target=target))
 
     def trigger_remove_mark(self, board_name, number_used):
         if board_name=="player":
@@ -791,9 +791,9 @@ class BingoGame:
         self.all_numbers=[n for n in self.all_numbers if n not in boost_numbers]
         random.shuffle(boost_numbers)
         self.all_numbers=boost_numbers+self.all_numbers
-        self.heal_message=f"✨ LATE UP {target.upper()}!"
+        self.heal_message=f"Rate UP {target.upper()}!"
         self.heal_timer=pygame.time.get_ticks()
-        push_skill_desc(("ผู้เล่น" if target=="player" else "T-T") + " ต่อไปจะเป็นเลขในกระดานT-T")
+        push_skill_desc(("ผู้เล่น" if target=="player" else "T-T") + " เพิ่ม Rate")
 
     def trigger_latedown(self, target, owner):
         board = self.player_board if target=="player" else self.bot_board
@@ -803,9 +803,9 @@ class BingoGame:
         reduce_count  = max(1, len(unmarked)//6)
         reduce_numbers = random.sample(unmarked, min(reduce_count, len(unmarked)))
         self.all_numbers = [n for n in self.all_numbers if n not in reduce_numbers] + reduce_numbers
-        self.heal_message = f"✨ LATE DOWN {target.upper()}!"
+        self.heal_message = f"Rate DOWN {target.upper()}!"
         self.heal_timer = pygame.time.get_ticks()
-        push_skill_desc(say(owner, "ถ่วงเลขไปท้ายคิว", target=target))
+        push_skill_desc(say(owner, "ลด Rate", target=target))
 
     def draw_hearts_image(self, surface, lives, pos, img, scale=1.0, gap=None):
         x, y = pos
@@ -815,6 +815,8 @@ class BingoGame:
         heart_img = pygame.transform.smoothscale(img, (size, size))
         for i in range(lives):
             surface.blit(heart_img, (x + i * gap, y))
+
+        # =========================UI===========================
 
     def draw(self, surface):
         # 1) BG
@@ -851,13 +853,13 @@ class BingoGame:
         bot_grid_h    = SIZE * BOT_CELL_SIZE    + (SIZE - 1) * GRID_GAP
         mid_y = (player_grid_y + player_grid_h/2 + bot_grid_y + bot_grid_h/2) / 2
 
-        # 5) กล่องเหลือง
+        # 5) กล่องเหลือง(กล่องskill)
         draw_skill_descriptions()
 
         # 6) ปู + แบนเนอร์
         banner_rect = self.banner_img.get_rect(midbottom=(mid_x, mid_y - 180))
         surface.blit(self.banner_img, banner_rect)
-        crab_rect = self.crab_img.get_rect(center=(mid_x -15, mid_y+10))
+        crab_rect = self.crab_img.get_rect(center=(mid_x - 10, mid_y+15))
         surface.blit(self.crab_img, crab_rect)
 
         # 7) เลขใต้ปู
@@ -896,13 +898,6 @@ class BingoGame:
         # 11) กล่องคู่มือ
         if show_help:
             draw_help_panel(surface)
-        
-        # 12) กล่องแจ้งผลแพ้/ชนะ
-        popup_btn_rect = None
-        if self.winner:
-            popup_btn_rect = draw_result_popup(surface, self.winner)
-        return popup_btn_rect
-
 
 
 # =====================================================
@@ -911,13 +906,12 @@ def crash_guard(e):
     traceback.print_exc()
 
 # =====================================================
-
 # ------------------- MAIN LOOP -------------------
 try:
-    layout_update_buttons()
+    layout_update_buttons()  # จัดวางปุ่มครั้งแรก
+
     game = BingoGame()
     running = True
-    last_popup_btn_rect = None
 
     while running:
         for event in pygame.event.get():
@@ -930,66 +924,75 @@ try:
                 background_scaled = pygame.transform.smoothscale(background_original, (event.w, event.h))
                 layout_update_buttons()
 
-            elif game.winner:
-                # ตอนเกมจบ: กด R หรือคลิกปุ่มใน popup เพื่อรีเซ็ต
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                # ถ้าเปิดคู่มืออยู่ คลิกตรงไหนก็ปิดก่อน
+                if show_help:
+                    show_help = False
+                    continue
+
+                # ปุ่มรีเซ็ต
+                if RESET_BTN_RECT.collidepoint(event.pos):
                     update_skill_timer(clear_all=True)
                     game = BingoGame()
-                    try: pygame.mixer.music.unpause()
-                    except: pass
+                    continue
 
-                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    if last_popup_btn_rect and last_popup_btn_rect.collidepoint(event.pos):
-                        update_skill_timer(clear_all=True)
-                        game = BingoGame()
-                        try: pygame.mixer.music.unpause()
-                        except: pass
+                # ปุ่มวิธีเล่น
+                if HELP_BTN_RECT.collidepoint(event.pos):
+                    show_help = True
+                    continue
 
-            else:
-                # โหมดปกติ
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    if show_help:
-                        show_help = False
-                    elif RESET_BTN_RECT.collidepoint(event.pos):
-                        update_skill_timer(clear_all=True)
-                        game = BingoGame()
-                        try: pygame.mixer.music.unpause()
-                        except: pass
-                    elif HELP_BTN_RECT.collidepoint(event.pos):
-                        show_help = True
-                    else:
-                        game.player_mark(event.pos)
+                # อื่นๆ
+                game.player_mark(event.pos)
 
-                elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_SPACE:
-                        update_skill_timer(clear_all=True)
-                        game.next_number()
-                    elif event.key in (pygame.K_EQUALS, pygame.K_PLUS):
-                        CRAB_USER_SCALE = min(3.0, CRAB_USER_SCALE + 0.1)
-                        game._build_fixed_mid_assets()
-                    elif event.key == pygame.K_MINUS:
-                        CRAB_USER_SCALE = max(0.3, CRAB_USER_SCALE - 0.1)
-                        game._build_fixed_mid_assets()
-                    elif event.key == pygame.K_r:
-                        update_skill_timer(clear_all=True)
-                        game = BingoGame()
-                        try: pygame.mixer.music.unpause()
-                        except: pass
-                    elif event.key == pygame.K_h:
-                        show_help = not show_help
-                    elif event.key == pygame.K_ESCAPE and show_help:
-                        show_help = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    update_skill_timer(clear_all=True)
+                    game.next_number()
 
-        # วาดฉากหลัก แล้ว "อัปเดต rect ของปุ่ม popup" ให้ใช้ในเฟรมถัดไป
-        last_popup_btn_rect = game.draw(screen)
+                elif event.key in (pygame.K_EQUALS, pygame.K_PLUS):
+                    CRAB_USER_SCALE = min(3.0, CRAB_USER_SCALE + 0.1)
+                    game._build_fixed_mid_assets()
+
+                elif event.key == pygame.K_MINUS:
+                    CRAB_USER_SCALE = max(0.3, CRAB_USER_SCALE - 0.1)
+                    game._build_fixed_mid_assets()
+
+                elif event.key == pygame.K_r:
+                    update_skill_timer(clear_all=True)
+                    game = BingoGame()
+
+                elif event.key == pygame.K_h:
+                    show_help = not show_help
+
+                elif event.key == pygame.K_ESCAPE and show_help:
+                    show_help = False
+
+        # timer เดิมไม่ต้องเคลื่อน ถ้าใช้แบบ clear_all
+
+        # ถ้าเกมจบ และยังไม่เคยเล่นเสียง ให้เล่นทันที (ครั้งเดียว)
+        if game.winner and not game.end_sound_played:
+            try:
+                if "Player" in game.winner:
+                    win_sound.play()
+                elif "Bot" in game.winner:
+                    lose_sound.play()
+            except NameError:
+                pass  # เผื่อยังไม่ได้ประกาศเสียง
+            game.end_sound_played = True
+
+        game.draw(screen)
+
+        # ถ้ามีคนแพ้ → วาด popup แล้วเช็คคลิกรีเซ็ต
+        if game.winner:
+            result = draw_result_popup(screen, game.winner)
+            if result == "reset":
+                game = BingoGame()
 
         pygame.display.flip()
         clock.tick(60)
 
-
-
 except Exception as e:
     crash_guard(e)
 finally:
-    pygame.quit() 
-
+    pygame.quit()
+    sys.exit()
